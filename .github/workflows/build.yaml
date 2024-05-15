@@ -1,0 +1,87 @@
+name: release
+concurrency:
+  group: release
+  cancel-in-progress: true
+on: 
+  push:
+    tags:
+      - 'v*'
+jobs:
+  build_and_release:
+    name: build_and_release
+    runs-on: ubuntu-22.04
+    steps:
+      - name: clone
+        uses: actions/checkout@main
+      - name: Setup Go
+        uses: actions/setup-go@main
+        with:
+          go-version: 1.22
+      - name: install depends
+        run: |
+          go mod download
+          mkdir artifacts
+      - name: build
+        run: |
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o artifacts/custom-exporter
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o artifacts/custom-exporter-arm64
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=7 go build -ldflags="-s -w" -o artifacts/custom-exporter-arm7
+      
+      - name: upload artifacts to cache
+        id: cache-artifacts
+        uses: actions/cache@main
+        with:
+          path: ./artifacts
+          key: artifacts
+
+  container_image:
+    name: container_image
+    runs-on: ubuntu-22.04
+    outputs:
+      image: ${{ steps.set-image-name.outputs.image }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@main
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+      - name: image name
+        id: set-image-name
+        run: |
+          name="$(echo ${{ github.repository }} | tr 'A-Z' 'a-z')"
+          echo "image=ghcr.io/$name:${{ github.ref_name }}" >> $GITHUB_OUTPUT
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v1
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          tags: ${{ steps.set-image-name.outputs.image }}
+  
+  release:
+    name: release
+    runs-on: ubuntu-22.04
+    needs: [build_and_release, container_image]
+    steps:
+    - name: download cache-artifacts
+      uses: actions/cache/restore@main
+      with:
+        path: ./artifacts
+        key: artifacts
+
+    - name: ${{ github.ref_name }}
+      uses: softprops/action-gh-release@v2
+      with:
+        body: |
+          container image:
+          ```
+          ${{ needs.container_image.outputs.image }}
+          ```
+        files: |
+          ./artifacts/*
