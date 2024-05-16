@@ -40,7 +40,7 @@ var (
 			Name: "process_running_status",
 			Help: "Status of process (running or not)",
 		},
-		[]string{"type"},
+		[]string{"process"},
 	)
 
 	processCpuTimeCounter = prometheus.NewCounterVec(
