@@ -47,7 +47,19 @@ func CountProcessTypes() (map[string]int, error) {
 		return nil, err
 	}
 
-	processTypes := make(map[string]int)
+	processTypes := map[string]int{
+		"running":                    0,
+		"idle":                       0,
+		"sleeping":                   0,
+		"uninterruptible_disk_sleep": 0,
+		"zombie":                     0,
+		"stopped":                    0,
+		"tracing_stop":               0,
+		"dead":                       0,
+		"wakekill":                   0,
+		"waking":                     0,
+		"parked":                     0,
+	}
 	for _, proc := range procs {
 		stat, err := proc.Stat()
 		if err != nil {
