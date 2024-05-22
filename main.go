@@ -13,6 +13,8 @@ import (
 	"github.com/orangeAppsRu/custom-exporter/pkg/metrics"
 	"github.com/orangeAppsRu/custom-exporter/pkg/network"	
 	"github.com/orangeAppsRu/custom-exporter/pkg/proc"	
+	"github.com/orangeAppsRu/custom-exporter/pkg/system"	
+	"github.com/orangeAppsRu/custom-exporter/pkg/puppet"	
 
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -20,7 +22,7 @@ import (
 )
 
 func main() {
-	configFilePath := flag.String("config", "", "path to config file")
+	configFilePath := flag.String("config", "", "path to config file (env CONFIG by default)")
 	flag.Parse()
 
 	if *configFilePath == "" {
@@ -56,21 +58,21 @@ func main() {
 
 				filesWithHash := []filehash.FileHash{}
 				for _, filePath := range cfg.FileHashCollector.Files {
+					number := 0.0
 					if _, err := os.Stat(filePath); err == nil {
-						number, err := filehash.Calculate(filePath)
+						number, err = filehash.Calculate(filePath)
 						if err != nil {
 							fmt.Printf("Error calculating hash for %s: %v\n", filePath, err)
 							continue
 						}
-			
-						filesWithHash = append(filesWithHash, filehash.FileHash{
-							File: filePath,
-							Hash: number,
-						})
 					}
+					filesWithHash = append(filesWithHash, filehash.FileHash{
+						File: filePath,
+						Hash: number,
+					})
 				}
 				metrics.UpdateFileHashMetrics(filesWithHash)
-				time.Sleep(60 * time.Second)
+				time.Sleep(180 * time.Second)
 			}
 		}()
 	}
@@ -107,6 +109,7 @@ func main() {
 				} else {
 					for process, usage := range processResources {
 						metrics.UpdateProcessCPUTimeMetrics(process, usage.CPUTime)
+						metrics.UpdateProcessMemoryResidentMetrics(process, usage.ResidentMemory)
 					}
 				}
 
@@ -122,6 +125,54 @@ func main() {
 			}
 		}()
 	}
+
+	if cfg.SystemCollector.Enabled {
+		go func() {
+			for {
+				// hostname checksum
+				if hostnameChecksum, err := system.HostnameChecksum(); err != nil {
+					fmt.Fprintf(os.Stderr, "Error getting hostname: %v\n", err)
+				} else {
+					metrics.UpdateHostnameChecksumMetrics(hostnameChecksum)
+				}
+				
+				// hostname 
+				if hostname, err := os.Hostname(); err != nil {
+					fmt.Fprintf(os.Stderr, "Error getting hostname: %v\n", err)
+				} else {
+					metrics.UpdateHostnameMetrics(hostname)
+				}
+				
+				// uptime
+				if uptime, err := system.UptimeInSeconds(); err != nil {
+					fmt.Fprintf(os.Stderr, "Error getting uptime: %v\n", err)
+				} else {
+					metrics.UpdateUptimeSecondsMetrics(uptime)
+				}
+
+				// count of login users
+				if countLoginUsers, err := system.CountLoginUsers(); err != nil {
+					fmt.Fprintf(os.Stderr, "Error getting count of login users: %v\n", err)
+				} else {
+					metrics.UpdateLoginUsersCountMetrics(countLoginUsers)
+				}	
+				time.Sleep(60 * time.Second)
+			}
+		}()
+	}
+
+	if cfg.PuppetCollector.Enabled {
+		go func() {
+			for {
+				p := puppet.NewPuppet(cfg.PuppetCollector.LastRunReportPath)
+
+				metrics.UpdatePuppetCatalogLastCompileTimestampMetrics(p.CheckCatalogLastCompile())
+				metrics.UpdatePuppetCatalogLastCompileStatusMetrics(p.CheckCatalogLastCompileStatus())
+
+				time.Sleep(300 * time.Second)
+			}
+		}()
+	}
 	
 	
 	http.Handle("/metrics", promhttp.Handler())
@@ -133,7 +184,4 @@ func main() {
 	if err := http.ListenAndServe(listenAddr, nil); err != nil {
 		fmt.Printf("Error starting server: %s\n", err)
 	}
-
-
 }
-

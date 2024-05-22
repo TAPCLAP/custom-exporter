@@ -1,11 +1,9 @@
 package filehash
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
+	"hash/crc32"
 	"fmt"
 	"os"
-	"strconv"
 )
 
 type FileHash struct {
@@ -19,16 +17,8 @@ func Calculate(filePath string) (float64, error) {
 		return 0, fmt.Errorf("error reading file: %v", err)
 	}
 
-	hash := sha256.Sum256(fileContent)
+	tablePolynomial := crc32.MakeTable(crc32.IEEE)
+	hash := crc32.Checksum([]byte(fileContent), tablePolynomial)
 
-	hashString := hex.EncodeToString(hash[:])
-
-	lastTenChars := hashString[len(hashString)-10:]
-
-	number, err := strconv.ParseUint(lastTenChars, 16, 64)
-	if err != nil {
-		return 0, fmt.Errorf("error converting to number: %v", err)
-	}
-
-	return float64(number), nil
+	return float64(hash), nil
 }
