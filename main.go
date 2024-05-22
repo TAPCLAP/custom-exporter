@@ -50,7 +50,7 @@ func main() {
 	}
 	listenAddr := fmt.Sprintf("%s:%s", host, port)
 
-	metrics.RegistrMetrics()
+	metrics.RegistrMetrics(cfg)
 
 	if cfg.FileHashCollector.Enabled  {
 		go func() {
@@ -135,6 +135,13 @@ func main() {
 				} else {
 					metrics.UpdateHostnameChecksumMetrics(hostnameChecksum)
 				}
+
+				// uname checksum
+				if unameChecksum, err := system.UnameChecksum(); err != nil {
+					fmt.Fprintf(os.Stderr, "Error getting uname: %v\n", err)
+				} else {
+					metrics.UpdateUnameChecksumMetrics(unameChecksum)
+				}
 				
 				// hostname 
 				if hostname, err := os.Hostname(); err != nil {
@@ -155,7 +162,9 @@ func main() {
 					fmt.Fprintf(os.Stderr, "Error getting count of login users: %v\n", err)
 				} else {
 					metrics.UpdateLoginUsersCountMetrics(countLoginUsers)
-				}	
+				}
+
+
 				time.Sleep(60 * time.Second)
 			}
 		}()

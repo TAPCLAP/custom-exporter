@@ -6,8 +6,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	// "encoding/binary"
-	// "encoding/json"
 	"os/exec"
 )
 
@@ -62,3 +60,13 @@ func CountLoginUsers() (int, error) {
 	return numUsers, nil
 }
 
+func UnameChecksum() (float64, error) {
+	output, err := exec.Command("uname", "-a").Output()
+	if err != nil {
+		return 0, fmt.Errorf("failed to execute 'uname -a': %w", err)
+	}
+	tablePolynomial := crc32.MakeTable(crc32.IEEE)
+	hash := crc32.Checksum([]byte(output), tablePolynomial)
+
+	return float64(hash), nil
+}

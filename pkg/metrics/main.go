@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"sync"
 
+	"github.com/orangeAppsRu/custom-exporter/pkg/config"
 	"github.com/orangeAppsRu/custom-exporter/pkg/filehash"
 	"github.com/orangeAppsRu/custom-exporter/pkg/network"
 	"github.com/prometheus/client_golang/prometheus"
@@ -74,6 +75,13 @@ var (
 		[]string{"hostname"},
 	)
 
+	unameChecksumGauge = prometheus.NewGauge(
+		prometheus.GaugeOpts{
+			Name: "uname_checksum",
+			Help: "Checksum of uname",
+		},
+	)
+
 	uptimeSecondsCounter = prometheus.NewCounter(
 		prometheus.CounterOpts{
 			Name: "uptime_seconds",
@@ -113,28 +121,44 @@ var (
 	processRunningStatusMutex sync.Mutex
 	hostnameChecksumMutex sync.Mutex
 	hostnameMutex sync.Mutex
+	unameChecksumMutex sync.Mutex
 	uptimeSecondsMutex sync.Mutex
 	countLoginUsersMutex sync.Mutex
 	puppetCatalogLastCompileTimestampMutex sync.Mutex
 	puppetCatalogLastCompileStatusMutex sync.Mutex
 )
 
-func RegistrMetrics() {
+func RegistrMetrics(cfg config.Config) {
     prometheus.DefaultRegisterer.Unregister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
     prometheus.DefaultRegisterer.Unregister(collectors.NewGoCollector())
 
-	prometheus.MustRegister(hashGauge)
-	prometheus.MustRegister(networkTargetGauge)
-	prometheus.MustRegister(processCountGauge)
-	prometheus.MustRegister(processCpuTimeCounter)
-	prometheus.MustRegister(processMemoryResidentGauge)
-	prometheus.MustRegister(processRunningStatusGauge)
-	prometheus.MustRegister(hostnameChecksumGauge)
-	prometheus.MustRegister(hostnameGauge)
-	prometheus.MustRegister(uptimeSecondsCounter)
-	prometheus.MustRegister(countLoginUsersGauge)
-	prometheus.MustRegister(puppetCatalogLastCompileTimestampGauge)
-	prometheus.MustRegister(puppetCatalogLastCompileStatusGauge)
+	if cfg.FileHashCollector.Enabled {
+		prometheus.MustRegister(hashGauge)
+	}
+
+	if cfg.PortCollector.Enabled {
+		prometheus.MustRegister(networkTargetGauge)
+	}
+
+	if cfg.ProcessCollector.Enabled {
+		prometheus.MustRegister(processCountGauge)
+		prometheus.MustRegister(processCpuTimeCounter)
+		prometheus.MustRegister(processMemoryResidentGauge)
+		prometheus.MustRegister(processRunningStatusGauge)
+	}
+
+	if cfg.SystemCollector.Enabled {
+		prometheus.MustRegister(hostnameChecksumGauge)
+		prometheus.MustRegister(hostnameGauge)
+		prometheus.MustRegister(unameChecksumGauge)
+		prometheus.MustRegister(uptimeSecondsCounter)
+		prometheus.MustRegister(countLoginUsersGauge)
+	}
+
+	if cfg.PuppetCollector.Enabled {
+		prometheus.MustRegister(puppetCatalogLastCompileTimestampGauge)
+		prometheus.MustRegister(puppetCatalogLastCompileStatusGauge)
+	}
 }
 
 func UpdateFileHashMetrics(filesWithHash []filehash.FileHash) {
@@ -199,6 +223,12 @@ func UpdateHostnameMetrics(hostname string) {
 	hostnameGauge.WithLabelValues(hostname).Set(1)
 	previousHostnameLabel = hostname
 	hostnameMutex.Unlock()
+}
+
+func UpdateUnameChecksumMetrics(checksum float64) {
+	unameChecksumMutex.Lock()
+	unameChecksumGauge.Set(checksum)
+	unameChecksumMutex.Unlock()
 }
 
 func UpdateUptimeSecondsMetrics(uptime float64) {
