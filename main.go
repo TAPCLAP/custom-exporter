@@ -3,27 +3,34 @@ package main
 import (
 	"flag"
 	"fmt"
+	"net/http"
 	"os"
 	"time"
-	"net/http"
-	// "encoding/json"
 
-	"github.com/orangeAppsRu/custom-exporter/pkg/filehash"
 	"github.com/orangeAppsRu/custom-exporter/pkg/config"
+	"github.com/orangeAppsRu/custom-exporter/pkg/filehash"
 	"github.com/orangeAppsRu/custom-exporter/pkg/metrics"
-	"github.com/orangeAppsRu/custom-exporter/pkg/network"	
-	"github.com/orangeAppsRu/custom-exporter/pkg/proc"	
-	"github.com/orangeAppsRu/custom-exporter/pkg/system"	
-	"github.com/orangeAppsRu/custom-exporter/pkg/puppet"	
-
+	"github.com/orangeAppsRu/custom-exporter/pkg/network"
+	"github.com/orangeAppsRu/custom-exporter/pkg/proc"
+	"github.com/orangeAppsRu/custom-exporter/pkg/puppet"
+	"github.com/orangeAppsRu/custom-exporter/pkg/system"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+)
 
+const (
+	version = "v0.0.5"
 )
 
 func main() {
 	configFilePath := flag.String("config", "", "path to config file (env CONFIG by default)")
+	versionFlag := flag.Bool("version", false, "print version")
 	flag.Parse()
+
+	if *versionFlag {
+		fmt.Println(version)
+		return
+	}
 
 	if *configFilePath == "" {
 		*configFilePath = os.Getenv("CONFIG")
