@@ -38,6 +38,10 @@ type Config struct {
         Enabled bool `yaml:"enabled"`
         LastRunReportPath string `yaml:"lastRunReportPath"`
     } `yaml:"puppetCollector"`
+
+    HetznerCollector struct {
+        Enabled bool `yaml:"enabled"`
+    } `yaml:"hetznerCollector"`
 }
 
 

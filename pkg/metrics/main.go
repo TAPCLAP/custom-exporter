@@ -7,6 +7,7 @@ import (
 	"github.com/orangeAppsRu/custom-exporter/pkg/config"
 	"github.com/orangeAppsRu/custom-exporter/pkg/filehash"
 	"github.com/orangeAppsRu/custom-exporter/pkg/network"
+	"github.com/orangeAppsRu/custom-exporter/pkg/hetzner"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 )
@@ -110,6 +111,14 @@ var (
 		},
 	)
 
+	hetznerServersGauge = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "hetzner_robot_server",
+			Help: "Hetzner robot server",
+		},
+		[]string{"id", "name", "type", "zone", "region", "ip"},
+	)
+
 
 	previousHostnameLabel string
 
@@ -126,6 +135,7 @@ var (
 	countLoginUsersMutex sync.Mutex
 	puppetCatalogLastCompileTimestampMutex sync.Mutex
 	puppetCatalogLastCompileStatusMutex sync.Mutex
+	hetznerServersMutex sync.Mutex
 )
 
 func RegistrMetrics(cfg config.Config) {
@@ -158,6 +168,10 @@ func RegistrMetrics(cfg config.Config) {
 	if cfg.PuppetCollector.Enabled {
 		prometheus.MustRegister(puppetCatalogLastCompileTimestampGauge)
 		prometheus.MustRegister(puppetCatalogLastCompileStatusGauge)
+	}
+
+	if cfg.HetznerCollector.Enabled {
+		prometheus.MustRegister(hetznerServersGauge)
 	}
 }
 
@@ -258,3 +272,19 @@ func UpdatePuppetCatalogLastCompileStatusMetrics(status bool) {
 	puppetCatalogLastCompileStatusGauge.Set(float64(statusValue))
 	puppetCatalogLastCompileStatusMutex.Unlock()
 }
+
+func UpdateHetznerServersMetrics(servers []hetzner.HrobotServer) {
+	for _, s := range servers {
+		hetznerServersMutex.Lock()
+		hetznerServersGauge.With(prometheus.Labels{
+			"id": strconv.Itoa(s.ID),
+			"name": s.Name,
+			"type": s.Type,
+			"zone": s.Zone,
+			"region": s.Region,
+			"ip": s.IP.String(),
+		}).Set(1)
+		hetznerServersMutex.Unlock()
+	}
+}
+

@@ -9,6 +9,7 @@ import (
 
 	"github.com/orangeAppsRu/custom-exporter/pkg/config"
 	"github.com/orangeAppsRu/custom-exporter/pkg/filehash"
+	"github.com/orangeAppsRu/custom-exporter/pkg/hetzner"
 	"github.com/orangeAppsRu/custom-exporter/pkg/metrics"
 	"github.com/orangeAppsRu/custom-exporter/pkg/network"
 	"github.com/orangeAppsRu/custom-exporter/pkg/proc"
@@ -19,7 +20,7 @@ import (
 )
 
 const (
-	version = "v0.0.5"
+	version = "v0.0.6"
 )
 
 func main() {
@@ -59,7 +60,7 @@ func main() {
 
 	metrics.RegistrMetrics(cfg)
 
-	if cfg.FileHashCollector.Enabled  {
+	if cfg.FileHashCollector.Enabled {
 		go func() {
 			for {
 
@@ -84,7 +85,7 @@ func main() {
 		}()
 	}
 
-	if cfg.PortCollector.Enabled  {
+	if cfg.PortCollector.Enabled {
 		go func() {
 			for {
 				rTargets := network.CheckTargets(cfg.PortCollector.Targets)
@@ -120,14 +121,14 @@ func main() {
 					}
 				}
 
-				if processRunningStatus, err := proc.FindProcessesByRegex(cfg.ProcessCollector.Processes); err != nil { 
+				if processRunningStatus, err := proc.FindProcessesByRegex(cfg.ProcessCollector.Processes); err != nil {
 					fmt.Printf("Error finding processes: %v\n", err)
 				} else {
 					for process, count := range processRunningStatus {
 						metrics.UpdateProcessRunningStatusMetrics(process, count)
 					}
 				}
-				
+
 				time.Sleep(60 * time.Second)
 			}
 		}()
@@ -149,14 +150,14 @@ func main() {
 				} else {
 					metrics.UpdateUnameChecksumMetrics(unameChecksum)
 				}
-				
-				// hostname 
+
+				// hostname
 				if hostname, err := os.Hostname(); err != nil {
 					fmt.Fprintf(os.Stderr, "Error getting hostname: %v\n", err)
 				} else {
 					metrics.UpdateHostnameMetrics(hostname)
 				}
-				
+
 				// uptime
 				if uptime, err := system.UptimeInSeconds(); err != nil {
 					fmt.Fprintf(os.Stderr, "Error getting uptime: %v\n", err)
@@ -170,7 +171,6 @@ func main() {
 				} else {
 					metrics.UpdateLoginUsersCountMetrics(countLoginUsers)
 				}
-
 
 				time.Sleep(60 * time.Second)
 			}
@@ -189,8 +189,29 @@ func main() {
 			}
 		}()
 	}
-	
-	
+
+	if cfg.HetznerCollector.Enabled {
+		hrobotUser := os.Getenv("HROBOT_USER")
+		if hrobotUser == "" {
+			fmt.Fprintf(os.Stderr, "Error: env \"HROBOT_USER\" is required if hetznerCollector is enabled\n")
+			os.Exit(1)
+		}
+
+		hrobotPass := os.Getenv("HROBOT_PASS")
+		if hrobotPass == "" {
+			fmt.Fprintf(os.Stderr, "Error: env \"HROBOT_PASS\" is required if hetznerCollector is enabled\n")
+			os.Exit(1)
+		}
+
+		hetzner := hetzner.NewHetzner(hrobotUser, hrobotPass)
+		go func() {
+			for {
+				metrics.UpdateHetznerServersMetrics(hetzner.GetServers())
+				time.Sleep(300 * time.Second)
+			}
+		}()
+	}
+
 	http.Handle("/metrics", promhttp.Handler())
 	http.HandleFunc("/ready", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
