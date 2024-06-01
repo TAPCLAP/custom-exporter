@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	version = "v0.0.7"
+	version = "v0.0.8"
 )
 
 func main() {
@@ -399,9 +399,19 @@ func main() {
 	}
 
 	http.Handle("/metrics", promhttp.Handler())
+	http.HandleFunc("/live", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	http.HandleFunc("/livez", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
 	http.HandleFunc("/ready", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
+	http.HandleFunc("/readyz", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
 
 	fmt.Println("Prometheus metrics server started at", listenAddr)
 	if err := http.ListenAndServe(listenAddr, nil); err != nil {
