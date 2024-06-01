@@ -40,8 +40,24 @@ type Config struct {
     } `yaml:"puppetCollector"`
 
     HetznerCollector struct {
-        Enabled bool `yaml:"enabled"`
+        Enabled bool                `yaml:"enabled"`
+        RandomSleepBeforeStart bool `default:"false" yaml:"randomSleepBeforeStart"`
     } `yaml:"hetznerCollector"`
+
+    HetznerCloudCollector struct {
+        Enabled bool                `yaml:"enabled"`
+        RandomSleepBeforeStart bool `default:"false" yaml:"randomSleepBeforeStart"`
+    } `yaml:"hetznerCloudCollector"`
+
+    YandexCloudCollector struct {
+        Enabled bool                `yaml:"enabled"`
+        RandomSleepBeforeStart bool `default:"false" yaml:"randomSleepBeforeStart"`
+    } `yaml:"yandexCloudCollector"`
+
+    AWSCloudCollector struct {
+        Enabled bool                `yaml:"enabled"`
+        RandomSleepBeforeStart bool `default:"false" yaml:"randomSleepBeforeStart"`
+    } `yaml:"awsCloudCollector"`
 }
 
 

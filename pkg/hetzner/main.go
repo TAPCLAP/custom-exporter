@@ -14,9 +14,6 @@ var (
 	updateServerList sync.Mutex
 )
 
-const (
-	hrobotPeriod = 300
-)
 
 type Hetzner struct {
 	hrobotServers []HrobotServer
@@ -25,7 +22,7 @@ type Hetzner struct {
 
 
 type HrobotServer struct {
-	ID     int		`json:"id"`
+	ID     int64	`json:"id"`
 	Name   string	`json:"name"`
 	Type   string	`json:"type"`
 	Zone   string   `json:"zone"`
@@ -37,10 +34,6 @@ type HrobotServer struct {
 func NewHetzner(user string, pass string) (*Hetzner) {
 	hetzner := Hetzner{}
 	hetzner.hrobot = hrobot.NewBasicAuthClient(user, pass)
-	err := hetzner.readHrobotServers()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error reading hrobot servers: %v\n", err)
-	}
 	return &hetzner
 }
 
@@ -53,7 +46,7 @@ func (h *Hetzner) readHrobotServers() error {
 	for _, s := range servers {
 		zone := strings.ToLower(strings.Split(s.Dc, "-")[0])
 		server := HrobotServer{
-			ID:     s.ServerNumber,
+			ID:     int64(s.ServerNumber),
 			Name:   s.ServerName,
 			Type:   s.Product,
 			Zone:   zone,

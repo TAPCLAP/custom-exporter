@@ -8,6 +8,10 @@ import (
 	"github.com/orangeAppsRu/custom-exporter/pkg/filehash"
 	"github.com/orangeAppsRu/custom-exporter/pkg/network"
 	"github.com/orangeAppsRu/custom-exporter/pkg/hetzner"
+	"github.com/orangeAppsRu/custom-exporter/pkg/hetznercloud"
+	"github.com/orangeAppsRu/custom-exporter/pkg/yandex"
+	"github.com/orangeAppsRu/custom-exporter/pkg/aws"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 )
@@ -119,6 +123,30 @@ var (
 		[]string{"id", "name", "type", "zone", "region", "ip"},
 	)
 
+	hetznerCloudServersGauge = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "hetzner_cloud_server",
+			Help: "Hetzner cloud server",
+		},
+		[]string{"id", "name", "type", "zone", "region", "ip"},
+	)
+
+	yandexCloudServersGauge = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "yandex_cloud_server",
+			Help: "Yandex cloud server",
+		},
+		[]string{"id", "name", "type", "zone", "region", "public_ip", "private_ip", "cpu_count", "memory"},
+	)
+
+	awsCloudServersGauge = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "aws_cloud_server",
+			Help: "AWS cloud server",
+		},
+		[]string{"id", "name", "type", "zone", "region", "public_ip", "private_ip", "private_dns_name"},
+	)
+
 
 	previousHostnameLabel string
 
@@ -136,6 +164,9 @@ var (
 	puppetCatalogLastCompileTimestampMutex sync.Mutex
 	puppetCatalogLastCompileStatusMutex sync.Mutex
 	hetznerServersMutex sync.Mutex
+	hetznerCloudServersMutex sync.Mutex
+	yandexCloudServersMutex sync.Mutex
+	awsCloudServersMutex sync.Mutex
 )
 
 func RegistrMetrics(cfg config.Config) {
@@ -172,6 +203,18 @@ func RegistrMetrics(cfg config.Config) {
 
 	if cfg.HetznerCollector.Enabled {
 		prometheus.MustRegister(hetznerServersGauge)
+	}
+
+	if cfg.HetznerCloudCollector.Enabled {
+		prometheus.MustRegister(hetznerCloudServersGauge)
+	}
+
+	if cfg.YandexCloudCollector.Enabled {
+		prometheus.MustRegister(yandexCloudServersGauge)
+	}
+
+	if cfg.AWSCloudCollector.Enabled {
+		prometheus.MustRegister(awsCloudServersGauge)
 	}
 }
 
@@ -277,7 +320,7 @@ func UpdateHetznerServersMetrics(servers []hetzner.HrobotServer) {
 	for _, s := range servers {
 		hetznerServersMutex.Lock()
 		hetznerServersGauge.With(prometheus.Labels{
-			"id": strconv.Itoa(s.ID),
+			"id": strconv.FormatInt(s.ID, 10),
 			"name": s.Name,
 			"type": s.Type,
 			"zone": s.Zone,
@@ -285,6 +328,72 @@ func UpdateHetznerServersMetrics(servers []hetzner.HrobotServer) {
 			"ip": s.IP.String(),
 		}).Set(1)
 		hetznerServersMutex.Unlock()
+	}
+}
+
+func UpdateHetznerCloudServersMetrics(servers []hetznercloud.Server) {
+	for _, s := range servers {
+		hetznerCloudServersMutex.Lock()
+		hetznerCloudServersGauge.With(prometheus.Labels{
+			"id": strconv.FormatInt(s.ID, 10),
+			"name": s.Name,
+			"type": s.Type,
+			"zone": s.Zone,
+			"region": s.Region,
+			"ip": s.IP.String(),
+		}).Set(1)
+		hetznerCloudServersMutex.Unlock()
+	}
+}
+
+func UpdateYandexCloudServersMetrics(servers []yandex.Server) {
+	for _, s := range servers {
+		yandexCloudServersMutex.Lock()
+		publicIP := s.PublicIP.String()
+		if publicIP == "<nil>" {
+			publicIP = ""
+		}
+		privateIP := s.PrivateIP.String()
+		if privateIP == "<nil>" {
+			privateIP = ""
+		}
+		yandexCloudServersGauge.With(prometheus.Labels{
+			"id": s.ID,
+			"name": s.Name,
+			"type": s.Type,
+			"zone": s.Zone,
+			"region": s.Region,
+			"public_ip": publicIP,
+			"private_ip": privateIP,
+			"cpu_count": strconv.FormatUint(uint64(s.CpuCount), 10),
+			"memory": strconv.FormatUint(s.Memory, 10),
+		}).Set(1)
+		yandexCloudServersMutex.Unlock()
+	}
+}
+
+func UpdateAWSCloudServersMetrics(servers []aws.Server) {
+	for _, s := range servers {
+		awsCloudServersMutex.Lock()
+		publicIP := s.PublicIP.String()
+		if publicIP == "<nil>" {
+			publicIP = ""
+		}
+		privateIP := s.PrivateIP.String()
+		if privateIP == "<nil>" {
+			privateIP = ""
+		}
+		awsCloudServersGauge.With(prometheus.Labels{
+			"id": s.ID,
+			"name": s.Name,
+			"private_dns_name": s.PrivateDnsName,
+			"type": s.Type,
+			"zone": s.Zone,
+			"region": s.Region,
+			"public_ip": publicIP,
+			"private_ip": privateIP,
+		}).Set(1)
+		awsCloudServersMutex.Unlock()
 	}
 }
 

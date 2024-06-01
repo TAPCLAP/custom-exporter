@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"time"
+	"encoding/base64"
 
 	"github.com/orangeAppsRu/custom-exporter/pkg/config"
 	"github.com/orangeAppsRu/custom-exporter/pkg/filehash"
@@ -15,12 +16,16 @@ import (
 	"github.com/orangeAppsRu/custom-exporter/pkg/proc"
 	"github.com/orangeAppsRu/custom-exporter/pkg/puppet"
 	"github.com/orangeAppsRu/custom-exporter/pkg/system"
+	"github.com/orangeAppsRu/custom-exporter/pkg/hetznercloud"
+	"github.com/orangeAppsRu/custom-exporter/pkg/yandex"
+	"github.com/orangeAppsRu/custom-exporter/pkg/aws"
+	"github.com/orangeAppsRu/custom-exporter/pkg/util"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 const (
-	version = "v0.0.6"
+	version = "v0.0.7"
 )
 
 func main() {
@@ -203,13 +208,194 @@ func main() {
 			os.Exit(1)
 		}
 
-		hetzner := hetzner.NewHetzner(hrobotUser, hrobotPass)
+
 		go func() {
+			if cfg.HetznerCollector.RandomSleepBeforeStart {
+				util.RandomSleep(1, 60, "Hetzner collector before start")
+			}
+			fmt.Println("Starting Hetzner collector")
+			hetzner := hetzner.NewHetzner(hrobotUser, hrobotPass)
 			for {
 				metrics.UpdateHetznerServersMetrics(hetzner.GetServers())
-				time.Sleep(300 * time.Second)
+				time.Sleep(600 * time.Second)
 			}
 		}()
+	}
+
+	if cfg.HetznerCloudCollector.Enabled {
+
+		if os.Getenv("HCLOUD_TOKEN") == "" && os.Getenv("HCLOUD_TOKEN_0") == "" {
+			fmt.Fprintf(os.Stderr, "Error: env \"HCLOUD_TOKEN\" or \"HCLOUD_TOKEN_<number>\" from 0 is required if hetznerCloudCollector is enabled\n")
+			os.Exit(1)
+		}
+
+		var hcloudConfigs []hetznercloud.ClientConfig
+
+		if os.Getenv("HCLOUD_TOKEN") != "" {
+			hcloudToken := os.Getenv("HCLOUD_TOKEN")
+			hcloudConfigs = append(hcloudConfigs, hetznercloud.ClientConfig{
+				Token: hcloudToken,
+			})
+		} else {
+			for i := 0; ; i++ {
+				hcloudToken := os.Getenv(fmt.Sprintf("HCLOUD_TOKEN_%d", i))
+				if hcloudToken == "" {
+					break
+				}
+				hcloudConfigs = append(hcloudConfigs, hetznercloud.ClientConfig{
+					Token: hcloudToken,
+				})
+			}
+		}
+		
+		go func() {
+			if cfg.HetznerCloudCollector.RandomSleepBeforeStart {
+				util.RandomSleep(1, 60, "Hetzner Cloud collector before start")
+			}
+			fmt.Println("Starting Hetzner Cloud collector")
+			
+			hetznerClouds := hetznercloud.NewHetznerClouds(hcloudConfigs)
+			for {
+				metrics.UpdateHetznerCloudServersMetrics(hetznerClouds.GetServers())
+				time.Sleep(600 * time.Second)
+			}
+		}()
+	}
+
+	if cfg.YandexCloudCollector.Enabled {
+
+		if os.Getenv("YANDEX_CLOUD_SERVICE_ACCOUNT_ID") == "" && os.Getenv("YANDEX_CLOUD_SERVICE_ACCOUNT_ID_0") == "" {
+			fmt.Fprintf(os.Stderr, "Error: env \"YANDEX_CLOUD_SERVICE_ACCOUNT_ID\" or \"YANDEX_CLOUD_SERVICE_ACCOUNT_ID<number>\" from 0 is required if yandexCloudCollector is enabled\n")
+			os.Exit(1)
+		}
+
+		var yandexConfigs []yandex.ClientConfig
+
+		if os.Getenv("YANDEX_CLOUD_SERVICE_ACCOUNT_ID") != "" {
+			
+			if os.Getenv("YANDEX_CLOUD_SERVICE_ACCOUNT_KEY_ID") == "" || os.Getenv("YANDEX_CLOUD_SERVICE_ACCOUNT_PRIVATE_KEY") == "" || os.Getenv("YANDEX_CLOUD_SERVICE_ACCOUNT_FOLDER_ID") == "" {
+				fmt.Fprintf(os.Stderr, "Error: env \"YANDEX_CLOUD_SERVICE_ACCOUNT_KEY_ID\" and \"YANDEX_CLOUD_SERVICE_ACCOUNT_PRIVATE_KEY\" and \"YANDEX_CLOUD_SERVICE_ACCOUNT_FOLDER_ID\" are required if yandexCloudCollector is enabled\n")
+				os.Exit(1)
+			}
+
+			yaServiceAccountId := os.Getenv("YANDEX_CLOUD_SERVICE_ACCOUNT_ID")
+			yaKeyID := os.Getenv("YANDEX_CLOUD_SERVICE_ACCOUNT_KEY_ID")
+			yaFolderId := os.Getenv("YANDEX_CLOUD_SERVICE_ACCOUNT_FOLDER_ID")
+			yaPrivateKey, err := base64.StdEncoding.DecodeString(os.Getenv("YANDEX_CLOUD_SERVICE_ACCOUNT_PRIVATE_KEY"))
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error: env \"YANDEX_CLOUD_SERVICE_ACCOUNT_PRIVATE_KEY\" is not base64 encoded\n")
+				os.Exit(1)
+			}
+
+			yandexConfigs = append(yandexConfigs, yandex.ClientConfig{
+				ServiceAccountID: yaServiceAccountId,
+				KeyID: yaKeyID,
+				PrivateKey: yaPrivateKey,
+				FolderID: yaFolderId,
+			})
+		} else {
+			for i := 0; ; i++ {
+				yaServiceAccountId := os.Getenv(fmt.Sprintf("YANDEX_CLOUD_SERVICE_ACCOUNT_ID_%d", i))
+				if yaServiceAccountId == "" {
+					break
+				}
+
+				if os.Getenv(fmt.Sprintf("YANDEX_CLOUD_SERVICE_ACCOUNT_KEY_ID_%d", i)) == "" || os.Getenv(fmt.Sprintf("YANDEX_CLOUD_SERVICE_ACCOUNT_PRIVATE_KEY_%d", i)) == "" || os.Getenv(fmt.Sprintf("YANDEX_CLOUD_SERVICE_ACCOUNT_FOLDER_ID_%d", i)) == ""{
+					fmt.Fprintf(os.Stderr, "Error: env \"YANDEX_CLOUD_SERVICE_ACCOUNT_KEY_ID_%d\" and \"YANDEX_CLOUD_SERVICE_ACCOUNT_PRIVATE_KEY_%d\" and \"YANDEX_CLOUD_SERVICE_ACCOUNT_FOLDER_ID_%d\" are required if YANDEX_CLOUD_SERVICE_ACCOUNT_ID_%d is exist and yandexCloudCollector is enabled\n", i, i, i, i)
+					os.Exit(1)
+				}
+
+				yaKeyID := os.Getenv(fmt.Sprintf("YANDEX_CLOUD_SERVICE_ACCOUNT_KEY_ID_%d", i))
+				yaFolderId := os.Getenv(fmt.Sprintf("YANDEX_CLOUD_SERVICE_ACCOUNT_FOLDER_ID_%d", i))
+				yaPrivateKey, err := base64.StdEncoding.DecodeString(os.Getenv(fmt.Sprintf("YANDEX_CLOUD_SERVICE_ACCOUNT_PRIVATE_KEY_%d", i)))
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "Error: env \"YANDEX_CLOUD_SERVICE_ACCOUNT_PRIVATE_KEY_%d\" is not base64 encoded\n", i)
+					os.Exit(1)
+				}
+				
+				yandexConfigs = append(yandexConfigs, yandex.ClientConfig{
+					ServiceAccountID: yaServiceAccountId,
+					KeyID: yaKeyID,
+					PrivateKey: yaPrivateKey,
+					FolderID: yaFolderId,
+				})
+			}
+		}
+		
+		go func() {
+			if cfg.YandexCloudCollector.RandomSleepBeforeStart {
+				util.RandomSleep(1, 60, "Yandex Cloud collector before start")
+			}
+			fmt.Println("Starting Yandex Cloud collector")
+			
+			yandexClouds := yandex.NewYandexClouds(yandexConfigs)
+			for {
+				metrics.UpdateYandexCloudServersMetrics(yandexClouds.GetServers())
+				time.Sleep(600 * time.Second)
+			}
+		}()
+	}
+
+	if cfg.AWSCloudCollector.Enabled {
+
+		if os.Getenv("AWS_ACCESS_KEY_ID") == "" && os.Getenv("AWS_ACCESS_KEY_ID_0") == "" {
+			fmt.Fprintf(os.Stderr, "Error: env \"AWS_ACCESS_KEY_ID\" or \"AWS_ACCESS_KEY_ID_<number>\" from 0 is required if awsCloudCollector is enabled\n")
+			os.Exit(1)
+		}
+
+		var awsConfigs []aws.ClientConfig
+
+		if os.Getenv("AWS_ACCESS_KEY_ID") != "" {
+			
+			if os.Getenv("AWS_ACCESS_KEY_ID") == "" || os.Getenv("AWS_SECRET_ACCESS_KEY") == "" || os.Getenv("AWS_DEFAULT_REGION") == "" {
+				fmt.Fprintf(os.Stderr, "Error: env \"AWS_ACCESS_KEY_ID\" and \"AWS_SECRET_ACCESS_KEY\" and \"AWS_DEFAULT_REGION\" are required if awsCloudCollector is enabled\n")
+				os.Exit(1)
+			}
+
+			awsAccessKeyID := os.Getenv("AWS_ACCESS_KEY_ID")
+			awsSecretAccessKey := os.Getenv("AWS_SECRET_ACCESS_KEY")
+			awsRegion := os.Getenv("AWS_DEFAULT_REGION")
+			awsConfigs = append(awsConfigs, aws.ClientConfig{
+				AccessKeyID: awsAccessKeyID,
+				SecretAccessKey: awsSecretAccessKey,
+				Region: awsRegion,
+			})
+
+		} else {
+			for i := 0; ; i++ {
+				awsAccessKeyID := os.Getenv(fmt.Sprintf("AWS_ACCESS_KEY_ID_%d", i))
+				if awsAccessKeyID == "" {
+					break
+				}
+
+				if os.Getenv(fmt.Sprintf("YANDEX_CLOUD_SERVICE_ACCOUNT_KEY_ID_%d", i)) == "" || os.Getenv(fmt.Sprintf("AWS_SECRET_ACCESS_KEY_%d", i)) == "" || os.Getenv(fmt.Sprintf("AWS_DEFAULT_REGION_%d", i)) == ""{
+					fmt.Fprintf(os.Stderr, "Error: env \"AWS_ACCESS_KEY_ID_%d\" and \"AWS_SECRET_ACCESS_KEY_%d\" and \"AWS_DEFAULT_REGION_%d\" are required if AWS_SECRET_ACCESS_KEY_%d is exist and awsCloudCollector is enabled\n", i, i, i, i)
+					os.Exit(1)
+				}
+
+				awsSecretAccessKey := os.Getenv(fmt.Sprintf("YANDEX_CLOUD_SERVICE_ACCOUNT_KEY_ID_%d", i))
+				awsRegion := os.Getenv(fmt.Sprintf("YANDEX_CLOUD_SERVICE_ACCOUNT_FOLDER_ID_%d", i))
+				awsConfigs = append(awsConfigs, aws.ClientConfig{
+					AccessKeyID: awsAccessKeyID,
+					SecretAccessKey: awsSecretAccessKey,
+					Region: awsRegion,
+				})
+			}
+		}
+
+		go func() {
+			if cfg.AWSCloudCollector.RandomSleepBeforeStart {
+				util.RandomSleep(1, 60, "AWS Cloud collector before start")
+			}
+			fmt.Println("Starting AWS Cloud collector")
+			
+			awsClouds := aws.NewAwsClouds(awsConfigs)
+			for {
+				metrics.UpdateAWSCloudServersMetrics(awsClouds.GetServers())
+				time.Sleep(600 * time.Second)
+			}
+		}()
+
 	}
 
 	http.Handle("/metrics", promhttp.Handler())
