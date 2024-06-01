@@ -44,13 +44,13 @@ func (h *Hetzner) readHrobotServers() error {
 	}
 	var hservers []HrobotServer
 	for _, s := range servers {
-		zone := strings.ToLower(strings.Split(s.Dc, "-")[0])
+		region := strings.ToLower(strings.Split(s.Dc, "-")[0])
 		server := HrobotServer{
 			ID:     int64(s.ServerNumber),
 			Name:   s.ServerName,
 			Type:   s.Product,
-			Zone:   zone,
-			Region: strings.ToLower(s.Dc),
+			Zone:   strings.ToLower(s.Dc),
+			Region: region,
 			IP:     net.ParseIP(s.ServerIP),
 		}
 		hservers = append(hservers, server)
