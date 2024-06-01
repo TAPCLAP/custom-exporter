@@ -6,7 +6,6 @@ import (
 	"os"
 	"sync"
     "strings"
-    // "encoding/json"
 
     "github.com/aws/aws-sdk-go/aws"
     "github.com/aws/aws-sdk-go/aws/session"
@@ -85,9 +84,6 @@ func (a *AWSClouds) getServers() {
 
         for _, reservation := range result.Reservations {
             for _, instance := range reservation.Instances {
-                // data, _ := json.MarshalIndent(instance, "", "    ")
-                // fmt.Println(string(data))
-
                 publicIP := ""
                 privateIP := ""
                 if instance.PublicIpAddress != nil {

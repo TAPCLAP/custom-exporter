@@ -6,7 +6,6 @@ import (
 	// "strings"
 	"sync"
 	"os"
-	"encoding/json"
 	"context"	
 
 	"github.com/hetznercloud/hcloud-go/v2/hcloud"
@@ -55,7 +54,7 @@ func NewHetznerClouds(clientClouds []ClientConfig) (*HetznerClouds) {
 }
 
 func (h *HetznerClouds) getServers() {
-	for i, c := range h.clients {
+	for _, c := range h.clients {
 		servers, _, err := c.client.Server.List(context.Background(), hcloud.ServerListOpts{})
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error reading hcloud servers: %v\n", err)
@@ -73,9 +72,6 @@ func (h *HetznerClouds) getServers() {
 			})
 		}
 		updateServerList.Unlock()
-		fmt.Printf("%d servers\n", i)
-		data, _ := json.MarshalIndent(h.servers, "", "    ")
-		fmt.Println(string(data))
 	}
 }
 
