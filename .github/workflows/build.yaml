@@ -9,7 +9,7 @@ on:
 jobs:
   build:
     name: build_and_release
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
       - name: clone
         uses: actions/checkout@main
@@ -25,7 +25,6 @@ jobs:
         run: |
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o artifacts/custom-exporter
           CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o artifacts/custom-exporter-arm64
-          CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=7 go build -ldflags="-s -w" -o artifacts/custom-exporter-arm7
       
       - name: upload artifacts to cache
         id: cache-artifacts
@@ -36,37 +35,34 @@ jobs:
 
   container_image:
     name: container_image
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     outputs:
-      image: ${{ steps.set-image-name.outputs.image }}
+      pushed-imaged: ${{ steps.build-images.outputs.pushed-images }}
     steps:
       - name: Checkout code
         uses: actions/checkout@main
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@master
-      - name: image name
-        id: set-image-name
-        run: |
-          name="$(echo ${{ github.repository }} | tr 'A-Z' 'a-z')"
-          echo "image=ghcr.io/$name:${{ github.ref_name }}" >> $GITHUB_OUTPUT
 
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@master
+      - uses: orangeappsru/build-images-action@main
+        id: build-images
         with:
           registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build and push Docker image
-        uses: docker/build-push-action@master
-        with:
-          context: .
-          push: true
-          platforms: linux/amd64,linux/arm64,linux/arm/v7
-          tags: ${{ steps.set-image-name.outputs.image }}
+          registry-user: ${{ github.repository_owner }}
+          registry-password: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          tag: ${{ github.ref_name }}
+          operation: build-and-push
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-opts: |
+            - name: main
+              repo-image-name: true
+              latest: true
+            - name: alpine
   
   release:
     name: release
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     needs: [build, container_image]
     steps:
     - name: download cache-artifacts
@@ -79,9 +75,9 @@ jobs:
       uses: softprops/action-gh-release@v2
       with:
         body: |
-          container image:
+          container images:
           ```
-          ${{ needs.container_image.outputs.image }}
+          ${{ needs.container_image.outputs.build-images }}
           ```
         files: |
           ./artifacts/*

@@ -1,0 +1,40 @@
+name: Test
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@main
+
+      - name: Setup Go
+        uses: actions/setup-go@main
+        with:
+          go-version: '1.22'
+
+      - name: Install dependencies
+        run: go mod download
+
+      - name: Build
+        run: |
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o artifacts/custom-exporter
+
+      - uses: orangeappsru/build-images-action@main
+        id: build-images
+        with:
+          registry: ghcr.io
+          registry-user: ${{ github.repository_owner }}
+          registry-password: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          tag: ${{ github.ref_name }}
+          operation: build
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-opts: |
+            - name: main
+      
+      # - name: Test
+      #   run: go test ./... -v -covermode=count
