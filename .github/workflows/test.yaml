@@ -1,0 +1,55 @@
+name: test-build
+concurrency:
+  group: test-build
+  cancel-in-progress: true
+on: 
+  push:
+    branches:
+      - test
+jobs:
+  container_image:
+    name: container_image
+    runs-on: ubuntu-22.04
+    outputs:
+      image: ${{ steps.set-image-name.outputs.image }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@main
+
+      - name: image name
+        id: set-image-name
+        run: |
+          name="$(echo ${{ github.repository }} | tr 'A-Z' 'a-z')"
+          echo "image=ghcr.io/$name:${{ github.ref_name }}" >> $GITHUB_OUTPUT
+
+      - uses: orangeappsru/build-images-action@platforms
+        id: build-images
+        with:
+          registry: ghcr.io
+          registry-user: ${{ github.repository_owner }}
+          registry-password: ${{ secrets.GITHUB_TOKEN }}
+          tag: ${{ steps.set-image-name.outputs.image }}
+          operation: build-and-push
+          # platforms: linux/amd64,linux/arm64,linux/arm/v7
+          build-opts: |
+            - name: scratch
+            - name: alpine
+
+      # - name: Set up Docker Buildx
+      #   uses: docker/setup-buildx-action@master
+
+      # - name: Login to GitHub Container Registry
+      #   uses: docker/login-action@master
+      #   with:
+      #     registry: ghcr.io
+      #     username: ${{ github.repository_owner }}
+      #     password: ${{ secrets.GITHUB_TOKEN }}
+      # - name: Build and push Docker image
+      #   uses: docker/build-push-action@master
+      #   with:
+      #     context: .
+      #     push: true
+      #     platforms: linux/amd64,linux/arm64,linux/arm/v7
+      #     tags: ${{ steps.set-image-name.outputs.image }}
+  
+
