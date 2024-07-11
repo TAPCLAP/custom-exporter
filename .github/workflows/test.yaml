@@ -5,7 +5,7 @@ concurrency:
 on: 
   push:
     branches:
-      - test
+      - test1
 jobs:
   container_image:
     name: container_image
@@ -22,15 +22,14 @@ jobs:
           name="$(echo ${{ github.repository }} | tr 'A-Z' 'a-z')"
           echo "image=ghcr.io/$name:${{ github.ref_name }}" >> $GITHUB_OUTPUT
 
-      - uses: orangeappsru/build-images-action@platforms
+      - uses: orangeappsru/build-images-action@main
         id: build-images
         with:
           registry: ghcr.io
           registry-user: ${{ github.repository_owner }}
           registry-password: ${{ secrets.GITHUB_TOKEN }}
           tag: ${{ github.ref_name }}
-          operation: build-and-push
-          platforms: linux/amd64,linux/arm64
+          operation: build
           build-opts: |
             - name: main
             - name: alpine
