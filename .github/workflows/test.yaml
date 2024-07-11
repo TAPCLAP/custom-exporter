@@ -9,7 +9,7 @@ on:
 jobs:
   container_image:
     name: container_image
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     outputs:
       image: ${{ steps.set-image-name.outputs.image }}
     steps:
