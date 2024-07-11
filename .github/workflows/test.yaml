@@ -1,6 +1,7 @@
 name: test-build
+run-name: main version
 concurrency:
-  group: test-build
+  group: test-build1
   cancel-in-progress: true
 on: 
   push:
