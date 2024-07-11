@@ -30,7 +30,7 @@ jobs:
           registry-user: ${{ github.repository_owner }}
           registry-password: ${{ secrets.GITHUB_TOKEN }}
           tag: ${{ github.ref_name }}
-          operation: build-and-push
+          operation: build
           platforms: linux/amd64
           build-opts: |
             - name: main
