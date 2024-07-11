@@ -5,7 +5,7 @@ concurrency:
 on: 
   push:
     branches:
-      - test2
+      - test3
 jobs:
   container_image:
     name: container_image
@@ -30,7 +30,6 @@ jobs:
           registry-password: ${{ secrets.GITHUB_TOKEN }}
           tag: ${{ github.ref_name }}
           operation: build-and-push
-          platforms: linux/amd64
           build-opts: |
             - name: main
             - name: alpine
