@@ -28,7 +28,7 @@ jobs:
           registry: ghcr.io
           registry-user: ${{ github.repository_owner }}
           registry-password: ${{ secrets.GITHUB_TOKEN }}
-          tag: ${{ steps.set-image-name.outputs.image }}
+          tag: ${{ github.ref_name }}
           operation: build-and-push
           # platforms: linux/amd64,linux/arm64,linux/arm/v7
           build-opts: |
