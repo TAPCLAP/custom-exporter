@@ -1,6 +1,7 @@
 name: test-build
+run-name: platforms version without platforms
 concurrency:
-  group: test-build
+  group: test-build3
   cancel-in-progress: true
 on: 
   push:
