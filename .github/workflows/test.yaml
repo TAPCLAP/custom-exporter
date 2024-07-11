@@ -1,6 +1,7 @@
 name: test-build
+run-name: platforms version linux/amd64
 concurrency:
-  group: test-build
+  group: test-build2
   cancel-in-progress: true
 on: 
   push:
