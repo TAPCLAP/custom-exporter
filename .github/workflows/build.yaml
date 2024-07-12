@@ -37,7 +37,7 @@ jobs:
     name: container_image
     runs-on: ubuntu-latest
     outputs:
-      pushed-imaged: ${{ steps.build-images.outputs.pushed-images }}
+      pushed-images: ${{ steps.build-images.outputs.pushed-images }}
     steps:
       - name: Checkout code
         uses: actions/checkout@main
@@ -77,7 +77,7 @@ jobs:
         body: |
           container images:
           ```
-          ${{ needs.container_image.outputs.build-images }}
+          ${{ needs.container_image.outputs.pushed-images }}
           ```
         files: |
           ./artifacts/*
