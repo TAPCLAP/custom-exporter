@@ -59,6 +59,7 @@ jobs:
               repo-image-name: true
               latest: true
             - name: alpine
+            - name: ubuntu
   
   release:
     name: release
