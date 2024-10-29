@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/go-yaml/yaml"
+	yaml "gopkg.in/yaml.v3"
     "github.com/orangeAppsRu/custom-exporter/pkg/network"
     "github.com/orangeAppsRu/custom-exporter/pkg/proc"
 )

@@ -6,7 +6,7 @@ import (
 	"os"
 	// "time"
 
-	"github.com/go-yaml/yaml"
+	yaml "gopkg.in/yaml.v3"
 )
 
 

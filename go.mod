@@ -4,7 +4,6 @@ go 1.22
 
 require (
 	github.com/aws/aws-sdk-go v1.53.14
-	github.com/go-yaml/yaml v2.1.0+incompatible
 	github.com/golang-jwt/jwt/v4 v4.5.0
 	github.com/hetznercloud/hcloud-go/v2 v2.9.0
 	github.com/nl2go/hrobot-go v0.1.4
@@ -12,13 +11,13 @@ require (
 	github.com/prometheus/procfs v0.15.1
 	github.com/yandex-cloud/go-genproto v0.0.0-20240529120826-df2b24336f42
 	github.com/yandex-cloud/go-sdk v0.0.0-20240529122015-8b0dc5b8bcbf
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/ghodss/yaml v1.0.0 // indirect
-	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
