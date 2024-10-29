@@ -3,6 +3,7 @@ package metrics
 import (
 	"strconv"
 	"sync"
+	"reflect"
 
 	"github.com/orangeAppsRu/custom-exporter/pkg/config"
 	"github.com/orangeAppsRu/custom-exporter/pkg/filehash"
@@ -138,6 +139,7 @@ var (
 		},
 		[]string{"id", "name", "type", "zone", "region", "public_ip", "private_ip", "cpu_count", "memory"},
 	)
+	yandexCloudServerIDs = make(map[string]prometheus.Labels)
 
 	awsCloudServersGauge = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
@@ -216,6 +218,10 @@ func RegistrMetrics(cfg config.Config) {
 	if cfg.AWSCloudCollector.Enabled {
 		prometheus.MustRegister(awsCloudServersGauge)
 	}
+}
+
+func compareLabels(a, b prometheus.Labels) bool {
+    return reflect.DeepEqual(a, b)
 }
 
 func UpdateFileHashMetrics(filesWithHash []filehash.FileHash) {
@@ -357,7 +363,7 @@ func UpdateYandexCloudServersMetrics(servers []yandex.Server) {
 		if privateIP == "<nil>" {
 			privateIP = ""
 		}
-		yandexCloudServersGauge.With(prometheus.Labels{
+		labels := prometheus.Labels{
 			"id": s.ID,
 			"name": s.Name,
 			"type": s.Type,
@@ -367,7 +373,11 @@ func UpdateYandexCloudServersMetrics(servers []yandex.Server) {
 			"private_ip": privateIP,
 			"cpu_count": strconv.FormatUint(uint64(s.CpuCount), 10),
 			"memory": strconv.FormatUint(s.Memory, 10),
-		}).Set(1)
+		}
+		if _, exists := yandexCloudServerIDs[s.ID]; exists && !compareLabels(labels, yandexCloudServerIDs[s.ID]) {
+			yandexCloudServersGauge.Delete(labels)
+		}
+		yandexCloudServersGauge.With(labels).Set(1)
 		yandexCloudServersMutex.Unlock()
 	}
 }
