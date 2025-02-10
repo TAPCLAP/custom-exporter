@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	version = "v0.0.8"
+	version = "v0.0.15"
 )
 
 func main() {
@@ -140,6 +140,7 @@ func main() {
 	}
 
 	if cfg.SystemCollector.Enabled {
+		systemCollector := metrics.GetSystemCollector()
 		go func() {
 			for {
 				// hostname checksum
@@ -167,7 +168,7 @@ func main() {
 				if uptime, err := system.UptimeInSeconds(); err != nil {
 					fmt.Fprintf(os.Stderr, "Error getting uptime: %v\n", err)
 				} else {
-					metrics.UpdateUptimeSecondsMetrics(uptime)
+					systemCollector.Update("uptime_seconds", uptime)
 				}
 
 				// count of login users

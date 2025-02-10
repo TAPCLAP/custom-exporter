@@ -88,12 +88,7 @@ var (
 		},
 	)
 
-	uptimeSecondsCounter = prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Name: "uptime_seconds",
-			Help: "Uptime of the machine in seconds",
-		},
-	)
+	systemCollector = NewCustomSystemCollector()
 
 	countLoginUsersGauge = prometheus.NewGauge(
 		prometheus.GaugeOpts{
@@ -161,7 +156,6 @@ var (
 	hostnameChecksumMutex sync.Mutex
 	hostnameMutex sync.Mutex
 	unameChecksumMutex sync.Mutex
-	uptimeSecondsMutex sync.Mutex
 	countLoginUsersMutex sync.Mutex
 	puppetCatalogLastCompileTimestampMutex sync.Mutex
 	puppetCatalogLastCompileStatusMutex sync.Mutex
@@ -170,6 +164,60 @@ var (
 	yandexCloudServersMutex sync.Mutex
 	awsCloudServersMutex sync.Mutex
 )
+
+type CustomSystemCollector struct {
+	metrics map[string]*prometheus.Desc
+	values  map[string]float64
+	mu    sync.Mutex
+}
+
+func NewCustomSystemCollector() *CustomSystemCollector {
+	return &CustomSystemCollector{
+		metrics: map[string]*prometheus.Desc{
+			"uptime_seconds": prometheus.NewDesc(
+				"uptime_seconds",
+				"Uptime of the machine in seconds",
+				nil,
+				nil,
+			),
+		},
+		values: map[string]float64{
+			"uptime_seconds": 0,
+		},
+	}
+}
+
+func (c *CustomSystemCollector) Describe(ch chan<- *prometheus.Desc) {
+	for _, desc := range c.metrics {
+		ch <- desc
+	}
+}
+
+func (c *CustomSystemCollector) Update(metric string, value float64) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if _, exists := c.values[metric]; exists {
+		c.values[metric] = value
+	}
+}
+
+func (c *CustomSystemCollector) Collect(ch chan<- prometheus.Metric) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	for key, desc := range c.metrics {
+		ch <- prometheus.MustNewConstMetric(
+			desc,
+			prometheus.GaugeValue,
+			c.values[key],
+		)
+	}
+}
+
+func GetSystemCollector() *CustomSystemCollector {
+	return systemCollector
+}
+
 
 func RegistrMetrics(cfg config.Config) {
     prometheus.DefaultRegisterer.Unregister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
@@ -194,8 +242,9 @@ func RegistrMetrics(cfg config.Config) {
 		prometheus.MustRegister(hostnameChecksumGauge)
 		prometheus.MustRegister(hostnameGauge)
 		prometheus.MustRegister(unameChecksumGauge)
-		prometheus.MustRegister(uptimeSecondsCounter)
 		prometheus.MustRegister(countLoginUsersGauge)
+		prometheus.MustRegister(systemCollector)
+
 	}
 
 	if cfg.PuppetCollector.Enabled {
@@ -292,12 +341,6 @@ func UpdateUnameChecksumMetrics(checksum float64) {
 	unameChecksumMutex.Lock()
 	unameChecksumGauge.Set(checksum)
 	unameChecksumMutex.Unlock()
-}
-
-func UpdateUptimeSecondsMetrics(uptime float64) {
-	uptimeSecondsMutex.Lock()
-	uptimeSecondsCounter.Add(uptime)
-	uptimeSecondsMutex.Unlock()
 }
 
 func UpdateLoginUsersCountMetrics(count int) {
