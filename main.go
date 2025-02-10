@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	version = "v0.0.15"
+	version = "v0.0.17"
 )
 
 func main() {
@@ -135,7 +135,7 @@ func main() {
 					}
 				}
 
-				time.Sleep(60 * time.Second)
+				time.Sleep(15 * time.Second)
 			}
 		}()
 	}
