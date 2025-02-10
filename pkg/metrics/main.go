@@ -50,13 +50,7 @@ var (
 		[]string{"process"},
 	)
 
-	processCpuTimeCounter = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "process_cpu_time_total",
-			Help: "CPU time consumed by processes",
-		},
-		[]string{"process"},
-	)
+	procCollector = NewCustomProcCollector()
 
 	processMemoryResidentGauge = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
@@ -150,7 +144,6 @@ var (
 	fileHashMutex sync.Mutex
 	networkTargetMutex sync.Mutex
 	processCountMutex sync.Mutex
-	processCpuTimeMutex sync.Mutex
 	processMemoryResidentMutex sync.Mutex
 	processRunningStatusMutex sync.Mutex
 	hostnameChecksumMutex sync.Mutex
@@ -208,7 +201,7 @@ func (c *CustomSystemCollector) Collect(ch chan<- prometheus.Metric) {
 	for key, desc := range c.metrics {
 		ch <- prometheus.MustNewConstMetric(
 			desc,
-			prometheus.GaugeValue,
+			prometheus.CounterValue,
 			c.values[key],
 		)
 	}
@@ -216,6 +209,62 @@ func (c *CustomSystemCollector) Collect(ch chan<- prometheus.Metric) {
 
 func GetSystemCollector() *CustomSystemCollector {
 	return systemCollector
+}
+
+type CustomProcCollector struct {
+	metrics map[string]*prometheus.Desc
+	values  map[string]map[string]float64
+	mu      sync.Mutex
+}
+
+
+func NewCustomProcCollector() *CustomProcCollector {
+	return &CustomProcCollector{
+		metrics: map[string]*prometheus.Desc{
+			"cpu_time": prometheus.NewDesc(
+				"process_cpu_time_total",
+				"CPU time consumed by processes",
+				[]string{"process"},
+				nil,
+			),
+		},
+		values: make(map[string]map[string]float64),
+	}
+}
+
+func (c *CustomProcCollector) Describe(ch chan<- *prometheus.Desc) {
+	for _, desc := range c.metrics {
+		ch <- desc
+	}
+}
+
+func (c *CustomProcCollector) Update(metric string, process string, value float64) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if _, ok := c.values[metric]; !ok {
+		c.values[metric] = make(map[string]float64)
+	}
+	c.values[metric][process] = value
+}
+
+func (c *CustomProcCollector) Collect(ch chan<- prometheus.Metric) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	for metricName, desc := range c.metrics {
+		for process, value := range c.values[metricName] {
+			ch <- prometheus.MustNewConstMetric(
+				desc,
+				prometheus.CounterValue,
+				value,
+				process,
+			)
+		}
+	}
+}
+
+func GetCustomProcCollector() *CustomProcCollector {
+	return procCollector
 }
 
 
@@ -233,9 +282,9 @@ func RegistrMetrics(cfg config.Config) {
 
 	if cfg.ProcessCollector.Enabled {
 		prometheus.MustRegister(processCountGauge)
-		prometheus.MustRegister(processCpuTimeCounter)
 		prometheus.MustRegister(processMemoryResidentGauge)
 		prometheus.MustRegister(processRunningStatusGauge)
+		prometheus.MustRegister(procCollector)
 	}
 
 	if cfg.SystemCollector.Enabled {
@@ -301,12 +350,6 @@ func UpdateProcessCountMetrics(typeProcess string, count int) {
 	processCountMutex.Lock()
 	processCountGauge.WithLabelValues(typeProcess).Set(float64(count))
 	processCountMutex.Unlock()
-}
-
-func UpdateProcessCPUTimeMetrics(process string, time float64) {
-	processCpuTimeMutex.Lock()
-	processCpuTimeCounter.WithLabelValues(process).Add(time)
-	processCpuTimeMutex.Unlock()
 }
 
 func UpdateProcessMemoryResidentMetrics(process string, memory uint64) {

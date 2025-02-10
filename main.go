@@ -102,6 +102,7 @@ func main() {
 
 	if cfg.ProcessCollector.Enabled {
 		go func() {
+			procCollector := metrics.GetCustomProcCollector()
 			for {
 				if np, err := proc.CountProcesses(); err != nil {
 					fmt.Printf("Error counting processes: %v\n", err)
@@ -121,7 +122,7 @@ func main() {
 					fmt.Printf("Error aggregating process resources: %v\n", err)
 				} else {
 					for process, usage := range processResources {
-						metrics.UpdateProcessCPUTimeMetrics(process, usage.CPUTime)
+						procCollector.Update("cpu_time", process, usage.CPUTime)
 						metrics.UpdateProcessMemoryResidentMetrics(process, usage.ResidentMemory)
 					}
 				}
