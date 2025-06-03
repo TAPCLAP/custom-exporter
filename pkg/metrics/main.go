@@ -4,6 +4,8 @@ import (
 	"strconv"
 	"sync"
 	"reflect"
+	"time"
+	"fmt"
 
 	"github.com/orangeAppsRu/custom-exporter/pkg/config"
 	"github.com/orangeAppsRu/custom-exporter/pkg/filehash"
@@ -128,7 +130,7 @@ var (
 		},
 		[]string{"id", "name", "type", "zone", "region", "public_ip", "private_ip", "cpu_count", "memory"},
 	)
-	yandexCloudServerIDs = make(map[string]prometheus.Labels)
+	yandexCloudServerIDs = make(map[string]MetricState)
 
 	awsCloudServersGauge = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
@@ -158,10 +160,19 @@ var (
 	awsCloudServersMutex sync.Mutex
 )
 
+const (
+	expiredDurationMetric = 30 * time.Minute
+)
+
 type CustomSystemCollector struct {
 	metrics map[string]*prometheus.Desc
 	values  map[string]float64
 	mu    sync.Mutex
+}
+
+type MetricState struct {
+	Expired time.Time `json:"expired"`
+	Labels  prometheus.Labels
 }
 
 func NewCustomSystemCollector() *CustomSystemCollector {
@@ -438,6 +449,7 @@ func UpdateHetznerCloudServersMetrics(servers []hetznercloud.Server) {
 	}
 }
 
+
 func UpdateYandexCloudServersMetrics(servers []yandex.Server) {
 	for _, s := range servers {
 		yandexCloudServersMutex.Lock()
@@ -460,11 +472,35 @@ func UpdateYandexCloudServersMetrics(servers []yandex.Server) {
 			"cpu_count": strconv.FormatUint(uint64(s.CpuCount), 10),
 			"memory": strconv.FormatUint(s.Memory, 10),
 		}
-		if _, exists := yandexCloudServerIDs[s.ID]; exists && !compareLabels(labels, yandexCloudServerIDs[s.ID]) {
-			yandexCloudServersGauge.Delete(labels)
+
+		if _, exists := yandexCloudServerIDs[s.ID]; exists && !compareLabels(labels, yandexCloudServerIDs[s.ID].Labels) {
+			yandexCloudServersGauge.Delete(yandexCloudServerIDs[s.ID].Labels)
+			delete(yandexCloudServerIDs, s.ID)
 		}
-		yandexCloudServersGauge.With(labels).Set(1)
+
+		if _, exists := yandexCloudServerIDs[s.ID]; !exists {
+			yandexCloudServersGauge.With(labels).Set(1)
+		}
+
+		yandexCloudServerIDs[s.ID] = MetricState{
+			Expired: time.Now().Add(expiredDurationMetric),
+			Labels: labels,
+		}
+
 		yandexCloudServersMutex.Unlock()
+	}
+}
+
+func CleanYandexCloudServersMetrics() {
+	yandexCloudServersMutex.Lock()
+	defer yandexCloudServersMutex.Unlock()
+
+	for id, state := range yandexCloudServerIDs {
+		if state.Expired.Before(time.Now()) {
+			fmt.Printf("Cleaning expired yandex_cloud_server metric: %s\n", id)
+			yandexCloudServersGauge.Delete(state.Labels)
+			delete(yandexCloudServerIDs, id)
+		}
 	}
 }
 

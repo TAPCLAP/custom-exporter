@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	version = "v0.0.17"
+	version = "v0.0.18"
 )
 
 func main() {
@@ -331,8 +331,16 @@ func main() {
 			fmt.Println("Starting Yandex Cloud collector")
 			
 			yandexClouds := yandex.NewYandexClouds(yandexConfigs)
+			i := 0
 			for {
 				metrics.UpdateYandexCloudServersMetrics(yandexClouds.GetServers())
+
+				if i == 4 {
+					metrics.CleanYandexCloudServersMetrics()
+					i = 0
+				}
+				i++
+				
 				time.Sleep(600 * time.Second)
 			}
 		}()
