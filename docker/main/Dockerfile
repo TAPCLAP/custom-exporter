@@ -1,4 +1,4 @@
-FROM docker.io/golang:1.23 AS build
+FROM docker.io/golang:1.25 AS build
 
 WORKDIR /app
 
@@ -10,7 +10,7 @@ COPY ./pkg ./pkg
 
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o ./custom-exporter .
 
-FROM docker.io/alpine:3.20.1 AS certificates
+FROM docker.io/alpine:3.23.4 AS certificates
 RUN apk add --no-cache ca-certificates
 
 FROM scratch
