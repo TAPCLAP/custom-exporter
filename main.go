@@ -20,6 +20,7 @@ import (
 	"github.com/orangeAppsRu/custom-exporter/pkg/yandex"
 	"github.com/orangeAppsRu/custom-exporter/pkg/aws"
 	"github.com/orangeAppsRu/custom-exporter/pkg/util"
+	"github.com/orangeAppsRu/custom-exporter/pkg/tlscert"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
@@ -406,6 +407,24 @@ func main() {
 			}
 		}()
 
+	}
+
+	if cfg.TLSCertificateCollector.Enabled {
+		go func() {
+			for {
+				certificates, err := tlscert.Scan(tlscert.ScanOptions{
+					Directories: cfg.TLSCertificateCollector.Directories,
+					Files:       cfg.TLSCertificateCollector.Files,
+					ExcludeCA:   cfg.TLSCertificateCollector.ExcludeCA,
+				})
+				if err != nil {
+					fmt.Printf("Error scanning TLS certificates: %v\n", err)
+				} else {
+					metrics.UpdateTLSCertificateMetrics(certificates)
+				}
+				time.Sleep(600 * time.Second)
+			}
+		}()
 	}
 
 	http.Handle("/metrics", promhttp.Handler())

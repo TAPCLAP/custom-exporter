@@ -58,6 +58,13 @@ type Config struct {
         Enabled bool                `yaml:"enabled"`
         RandomSleepBeforeStart bool `default:"false" yaml:"randomSleepBeforeStart"`
     } `yaml:"awsCloudCollector"`
+
+    TLSCertificateCollector struct {
+        Enabled     bool     `yaml:"enabled"`
+        ExcludeCA   bool     `yaml:"excludeCA"`
+        Directories []string `yaml:"directories"`
+        Files       []string `yaml:"files"`
+    } `yaml:"tlsCertificateCollector"`
 }
 
 

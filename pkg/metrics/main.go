@@ -14,6 +14,7 @@ import (
 	"github.com/orangeAppsRu/custom-exporter/pkg/hetznercloud"
 	"github.com/orangeAppsRu/custom-exporter/pkg/yandex"
 	"github.com/orangeAppsRu/custom-exporter/pkg/aws"
+	"github.com/orangeAppsRu/custom-exporter/pkg/tlscert"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
@@ -140,6 +141,14 @@ var (
 		[]string{"id", "name", "type", "zone", "region", "public_ip", "private_ip", "private_dns_name"},
 	)
 
+	tlsCertificateExpirationGauge = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "file_tls_certificate_expiration_seconds",
+			Help: "Number of seconds until TLS certificate expiration",
+		},
+		[]string{"file", "common_name", "issuer", "dns_names"},
+	)
+	tlsCertificateMetricStates = make(map[string]prometheus.Labels)
 
 	previousHostnameLabel string
 
@@ -158,6 +167,7 @@ var (
 	hetznerCloudServersMutex sync.Mutex
 	yandexCloudServersMutex sync.Mutex
 	awsCloudServersMutex sync.Mutex
+	tlsCertificateMutex sync.Mutex
 )
 
 const (
@@ -326,6 +336,10 @@ func RegistrMetrics(cfg config.Config) {
 
 	if cfg.AWSCloudCollector.Enabled {
 		prometheus.MustRegister(awsCloudServersGauge)
+	}
+
+	if cfg.TLSCertificateCollector.Enabled {
+		prometheus.MustRegister(tlsCertificateExpirationGauge)
 	}
 }
 
@@ -501,6 +515,46 @@ func CleanYandexCloudServersMetrics() {
 			yandexCloudServersGauge.Delete(state.Labels)
 			delete(yandexCloudServerIDs, id)
 		}
+	}
+}
+
+func tlsCertificateMetricKey(labels prometheus.Labels) string {
+	return fmt.Sprintf("%s|%s|%s|%s",
+		labels["file"],
+		labels["common_name"],
+		labels["issuer"],
+		labels["dns_names"],
+	)
+}
+
+func UpdateTLSCertificateMetrics(certificates []tlscert.Certificate) {
+	tlsCertificateMutex.Lock()
+	defer tlsCertificateMutex.Unlock()
+
+	currentKeys := make(map[string]struct{}, len(certificates))
+	now := time.Now()
+
+	for _, cert := range certificates {
+		labels := prometheus.Labels{
+			"file":        cert.File,
+			"common_name": cert.CommonName,
+			"issuer":      cert.Issuer,
+			"dns_names":   cert.DNSNames,
+		}
+		key := tlsCertificateMetricKey(labels)
+		currentKeys[key] = struct{}{}
+
+		secondsUntilExpiration := cert.ExpirationTime.Sub(now).Seconds()
+		tlsCertificateExpirationGauge.With(labels).Set(secondsUntilExpiration)
+		tlsCertificateMetricStates[key] = labels
+	}
+
+	for key, labels := range tlsCertificateMetricStates {
+		if _, exists := currentKeys[key]; exists {
+			continue
+		}
+		tlsCertificateExpirationGauge.Delete(labels)
+		delete(tlsCertificateMetricStates, key)
 	}
 }
 
